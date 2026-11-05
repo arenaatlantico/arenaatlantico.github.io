@@ -341,10 +341,8 @@ p{margin:0}
 <script>
 (function(){
   var d=document.documentElement,seen=false,reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  try{seen=sessionStorage.getItem('aa-intro')==='1';}catch(e){}
-  if(seen||reduce)return;
+  if(reduce)return;
   d.classList.add('js-intro');
-  try{sessionStorage.setItem('aa-intro','1');}catch(e){}
 })();
 </script>
 <header class="top">
