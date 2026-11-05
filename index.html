@@ -58,7 +58,7 @@ p{margin:0}
 .brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--cream)}
 .brand img{width:48px;height:48px;border-radius:50%}
 .brand span{font-family:var(--display);font-weight:800;font-size:1.45rem;letter-spacing:.08em;text-transform:uppercase}
-.nav{display:flex;align-items:center;gap:26px}
+.nav{display:flex;align-items:center;gap:22px}
 .nav a{color:var(--muted);text-decoration:none;font-weight:600;font-size:.95rem;letter-spacing:.04em}
 .nav a:hover{color:var(--cream)}
 .nav a.btn{color:var(--ink)}
@@ -272,6 +272,22 @@ p{margin:0}
 .peek span{background:var(--cream);color:var(--ink);font-weight:700;font-size:.9rem;padding:8px 12px;box-shadow:3px 4px 0 var(--wine-deep);order:-1}
 @media (max-width:640px){.peek span{display:none}}
 
+
+/* música */
+.snd{display:inline-flex;align-items:center;gap:10px;min-height:44px;padding:0 14px;background:none;border:1px solid #4A3E3B;color:var(--cream);font:600 .9rem var(--body);letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+.snd:hover{border-color:var(--gold);color:var(--gold-hi)}
+.snd .eq{display:inline-flex;align-items:flex-end;gap:3px;height:18px}
+.snd .eq b{display:block;width:3px;height:6px;background:var(--gold)}
+.snd[aria-pressed="true"]{border-color:var(--gold)}
+.snd[aria-pressed="true"] .eq b{animation:eq .9s ease-in-out infinite}
+.snd[aria-pressed="true"] .eq b:nth-child(2){animation-delay:-.3s}
+.snd[aria-pressed="true"] .eq b:nth-child(3){animation-delay:-.6s}
+.snd[aria-pressed="true"] .eq b:nth-child(4){animation-delay:-.15s}
+@keyframes eq{0%,100%{height:5px}50%{height:18px}}
+@media (max-width:520px){.snd .lbl{display:none}.snd{padding:0 12px}}
+
+@media (max-width:520px){.top .wrap{gap:10px}.brand{gap:8px;min-width:0}.brand img{width:40px;height:40px}.brand span{font-size:1.02rem;letter-spacing:.04em;white-space:nowrap}.nav{gap:8px;flex:none}.nav .btn{padding:0 .8em;font-size:.95rem}}
+@media (max-width:430px){.brand span{display:none}}
 /* abertura */
 .intro{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;overflow:hidden;background:var(--ink)}
 .js-intro .intro{display:flex}
@@ -353,6 +369,7 @@ p{margin:0}
       <a href="#campos">Campos</a>
       <a href="#estrutura">Estrutura</a>
       <a href="#local">Local</a>
+      <button class="snd" type="button" id="snd" aria-pressed="false" aria-label="Tocar música"><span class="eq" aria-hidden="true"><b></b><b></b><b></b><b></b></span><span class="lbl" id="snd-lbl">Música</span></button>
       <a class="btn btn-gold" href="#reservar">Reservar</a>
     </nav>
   </div>
@@ -659,6 +676,59 @@ p{margin:0}
 <a class="fab" href="https://wa.me/5513997061707" target="_blank" rel="noopener" aria-label="Falar no WhatsApp"><svg aria-hidden="true"><use href="#i-wa"/></svg></a>
 
 <script>
+/* ---------- trilha original (Web Audio) ---------- */
+(function(){
+  var btn=document.getElementById('snd'),lbl=document.getElementById('snd-lbl');
+  var AC=window.AudioContext||window.webkitAudioContext;
+  if(!btn)return;
+  if(!AC){btn.hidden=true;return;}
+  var ctx=null,master,noise,playing=false,timer=0,step=0,nextT=0;
+  var BPM=100,S16=60/BPM/4;
+  /* Lá menor: Am - F - C - G */
+  var roots=[45,41,48,43],chords=[[57,60,64],[53,57,60],[52,55,60],[50,55,59]];
+  var bassPat=[1,0,0,1, 0,0,1,0, 1,0,0,1, 0,1,0,0];
+  var hz=function(m){return 440*Math.pow(2,(m-69)/12);};
+  function setup(){
+    ctx=new AC();
+    var comp=ctx.createDynamicsCompressor();comp.threshold.value=-14;comp.ratio.value=4;
+    master=ctx.createGain();master.gain.value=0;master.connect(comp);comp.connect(ctx.destination);
+    noise=ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate);var d=noise.getChannelData(0);for(var i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+  }
+  function env(g,t,a,peak,dec){g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+dec);}
+  function kick(t){var o=ctx.createOscillator(),g=ctx.createGain();o.frequency.setValueAtTime(150,t);o.frequency.exponentialRampToValueAtTime(42,t+.14);env(g,t,.004,.9,.32);o.connect(g);g.connect(master);o.start(t);o.stop(t+.35);}
+  function surdo(t,f,v){var o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';o.frequency.setValueAtTime(f*1.4,t);o.frequency.exponentialRampToValueAtTime(f,t+.08);env(g,t,.005,v,.45);o.connect(g);g.connect(master);o.start(t);o.stop(t+.5);}
+  function hit(t,type,freq,q,v,dec){var src=ctx.createBufferSource();src.buffer=noise;var f=ctx.createBiquadFilter();f.type=type;f.frequency.value=freq;f.Q.value=q;var g=ctx.createGain();env(g,t,.002,v,dec);src.connect(f);f.connect(g);g.connect(master);src.start(t,Math.random()*.5);src.stop(t+dec+.02);}
+  function bass(t,m,len){var o=ctx.createOscillator(),f=ctx.createBiquadFilter(),g=ctx.createGain();o.type='sawtooth';o.frequency.value=hz(m);f.type='lowpass';f.frequency.setValueAtTime(900,t);f.frequency.exponentialRampToValueAtTime(220,t+len);env(g,t,.01,.32,len);o.connect(f);f.connect(g);g.connect(master);o.start(t);o.stop(t+len+.05);}
+  function stab(t,notes){notes.forEach(function(m){[0,7].forEach(function(det){var o=ctx.createOscillator(),f=ctx.createBiquadFilter(),g=ctx.createGain();o.type='sawtooth';o.frequency.value=hz(m);o.detune.value=det;f.type='lowpass';f.frequency.value=2200;env(g,t,.006,.045,.22);o.connect(f);f.connect(g);g.connect(master);o.start(t);o.stop(t+.26);});});}
+  function play(i,t){
+    var s=i%16,bar=Math.floor(i/16)%4;
+    if(s===0||s===8)kick(t);
+    if(s===4||s===12)hit(t,'bandpass',1900,.9,.45,.14);
+    if(s===3||s===11)surdo(t,62,.35);
+    if(s===6||s===14)surdo(t,82,.28);
+    hit(t,'highpass',7000,.7,(s%4===2)?.22:.09,.045);
+    if(s===10&&bar===3)hit(t,'bandpass',2600,1.2,.3,.1);
+    if(bassPat[s])bass(t,roots[bar]+(s===13?7:0),S16*2.2);
+    if(s===2||s===7||s===10)stab(t,chords[bar]);
+  }
+  function tick(){while(nextT<ctx.currentTime+.12){play(step,nextT);nextT+=S16;step++;}}
+  function start(){
+    if(!ctx)setup();
+    ctx.resume();nextT=ctx.currentTime+.06;step=0;
+    master.gain.cancelScheduledValues(ctx.currentTime);master.gain.setValueAtTime(master.gain.value,ctx.currentTime);master.gain.linearRampToValueAtTime(.38,ctx.currentTime+.8);
+    timer=setInterval(tick,25);playing=true;
+    btn.setAttribute('aria-pressed','true');btn.setAttribute('aria-label','Pausar música');lbl.textContent='Pausar';
+  }
+  function stop(){
+    if(!ctx)return;
+    master.gain.cancelScheduledValues(ctx.currentTime);master.gain.setValueAtTime(master.gain.value,ctx.currentTime);master.gain.linearRampToValueAtTime(0,ctx.currentTime+.3);
+    clearInterval(timer);playing=false;
+    btn.setAttribute('aria-pressed','false');btn.setAttribute('aria-label','Tocar música');lbl.textContent='Música';
+  }
+  btn.addEventListener('click',function(){playing?stop():start();});
+  document.addEventListener('visibilitychange',function(){if(document.hidden&&playing)stop();});
+})();
+
 /* ---------- abertura ---------- */
 (function(){
   var el=document.getElementById('intro');
